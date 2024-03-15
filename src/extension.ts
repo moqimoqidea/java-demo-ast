@@ -1,48 +1,71 @@
-import * as vscode from 'vscode';
-import { Parser } from 'web-tree-sitter';
+import * as vscode from "vscode";
+import { SyntaxNode } from "tree-sitter";
 
-async function loadWasmParser() {
-  await Parser.init();
+const Parser = require("web-tree-sitter");
+
+async function getParser() {
+  await Parser.init().then(() => {
+    console.log("Tree-sitter WASM loaded");
+  });
   const parser = new Parser();
-  const Lang = await require('web-tree-sitter-java')();
-  parser.setLanguage(Lang);
+  const Java = await Parser.Language.load("tree-sitter-java.wasm");
+  parser.setLanguage(Java);
   return parser;
 }
 
 async function getJavaContent(text: string) {
-  const parser = await loadWasmParser();
-  const tree = parser.parse(text);
+  // 解析给定的文本
+  const javaParser = await getParser();
+  const tree = javaParser.parse(text);
 
-  // 示例：获取类名、函数和变量
-  console.log('Parsed tree:', tree);
-
-  // 你可以根据需要进一步解析tree，这里只是一个基本示例
   let classNames: string[] = [];
-  let functionNames: string[] = [];
-  let variableNames: string[] = [];
 
-  // 这里需要根据Java语法的实际树结构来遍历和解析，此处省略具体实现
-  // 示例代码省略了具体的遍历和解析逻辑
+  // 遍历 AST
+  traverse(tree.rootNode, (node: SyntaxNode) => {
+    // 如果节点是一个类声明，那么提取出类名
+    if (node.type === "class_declaration") {
+      const classNameNode = node.namedChildren.find(
+        (child: SyntaxNode) => child.type === "identifier"
+      );
+      if (classNameNode) {
+        classNames.push(classNameNode.text);
+      }
+    }
+  });
 
-  return {
-    classNames,
-    functionNames,
-    variableNames
-  };
+  return classNames;
+}
+
+function traverse(
+  node: SyntaxNode,
+  visit: (node: SyntaxNode) => boolean | void
+) {
+  const shouldContinue = visit(node);
+  if (shouldContinue !== false) {
+    for (const child of node.namedChildren) {
+      traverse(child, visit);
+    }
+  }
 }
 
 export function activate(context: vscode.ExtensionContext) {
-  console.log('Java Content Reader is now active!');
+  console.log("Java Content Reader is now active!");
 
-  let disposable = vscode.commands.registerCommand('javaContentReader.getJavaContent', async () => {
-    const editor = vscode.window.activeTextEditor;
-    if (editor) {
-      const document = editor.document;
-      const text = document.getText();
-      const content = await getJavaContent(text);
-      console.log(content);
+  let disposable = vscode.commands.registerCommand(
+    "javaContentReader.getJavaContent",
+    async () => {
+      const editor = vscode.window.activeTextEditor;
+      if (editor) {
+        const document = editor.document;
+        const text = document.getText();
+        const classNames = await getJavaContent(text);
+        console.log(classNames);
+        vscode.window.showInformationMessage(
+          `Class Names: ${classNames.join(", ")}`
+        );
+      }
     }
-  });
+  );
 
   context.subscriptions.push(disposable);
 }

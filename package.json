@@ -54,7 +54,9 @@
     "webpack-cli": "^5.1.4"
   },
   "dependencies": {
+    "assemblyscript": "^0.27.25",
     "tree-sitter": "^0.20.6",
-    "web-tree-sitter": "^0.20.8"
+    "tree-sitter-java": "^0.20.2",
+    "web-tree-sitter": "^0.22.1"
   }
 }
